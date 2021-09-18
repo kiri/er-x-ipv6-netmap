@@ -1,0 +1,47 @@
+#!/bin/bash
+# License: CC0
+#
+set -e
+export LANG=C
+
+function ipv6expand(){
+  ip="$1"
+  expr "$ip" : '[[:xdigit:]:]\{2,\}$' >/dev/null
+  echo $ip |grep -sqEv '[[:xdigit:]]{5}|:::|::.*::'
+  cn=$(echo $ip |grep -o : |wc -l)
+  test $cn -ge 2 -a $cn -le 7
+  ip=$(echo $ip |sed '
+      s/^:/0000:/
+      s/:$/:0000/
+      s/.*/:&:/
+      :add0
+      s/:\([^:]\{1,3\}\):/:0\1:/g
+      t add0
+      s/:\(.*\):/\1/' )
+  if echo $ip |grep -sq :: ; then
+    ip=$(echo $ip |sed s/::/:$(echo -n :::::: |tail -c $((8-cn)) |sed 's/:/0000:/g')/ )
+  else
+    test $cn -eq 7
+  fi
+  echo $ip
+  # https://qiita.com/obsolete-standard/items/e410530cecb0a21d3ecc
+}
+
+# main
+#logger "DEBUG: update-ndproxy start"
+
+PREFIX=$(rdisc6 -q eth0 -1|awk -F: '{printf "%s:%s:%s:%s",$1,$2,$3,$4}')
+
+if [ $(/bin/ip -6 neigh show proxy|wc -l) -gt 64 ]; then
+  /bin/ip -6 neigh flush proxy
+fi
+
+CTRACK=$(/usr/sbin/conntrack -f ipv6 -L)
+( echo "$CTRACK"|awk '!/tcp/{gsub("src=","",$4);print $4}';\
+  echo "$CTRACK"|awk  '/tcp/{gsub("src=","",$5);print $5}')|sort -u |\
+while read line; do
+  ip -6 neigh add proxy $(ipv6expand $line| awk -v PREFIX=$PREFIX -F: '{printf "%s:%s:%s:%s:%s",PREFIX,$5,$6,$7,$8}') dev eth0 
+done
+
+#/bin/ip -6 neigh show proxy|logger
+#logger "DEBUG: update-ndproxy done"

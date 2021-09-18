@@ -1,0 +1,10 @@
+[Unit]
+Description=ipv6_neigh_proxy
+
+[Service]
+Type=simple
+ExecStart=/config/user-data/update-ndproxy
+
+[Install]
+WantedBy=multi-user.target
+
