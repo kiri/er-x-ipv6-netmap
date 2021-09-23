@@ -45,10 +45,10 @@ PREFIX2=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*switch0.*256.*/\1/p"|grep -v
 /sbin/ip6tables -t nat -A PREROUTING  -i eth0 -j NETMAP -d   $PREFIX1 --to $PREFIX2
 
 CTRACK=$(/usr/sbin/conntrack -f ipv6 -L)
-( echo "$CTRACK"|awk '!/tcp/{gsub("src=","",$4);print $4}';\
-  echo "$CTRACK"|awk  '/tcp/{gsub("src=","",$5);print $5}')|sort -u |\
+( echo "$CTRACK"|awk '!/tcp/{gsub("dst=","",$9);print $9}';\
+  echo "$CTRACK"|awk  '/tcp/{gsub("dst=","",$10);print $10}')|sort -u |\
 while read line; do   
-  /bin/ip -6 neigh add proxy $(echo "$(ipv6expand $PREFIX1):$(ipv6expand $line)"|awk -F: '{printf "%s:%s:%s:%s:%s:%s:%s:%s\n",$1,$2,$3,$4,$13,$14,$15,$16}') dev eth0 
+  /bin/ip -6 neigh add proxy $line dev eth0 
 done
 
 #/bin/ip -6 neigh show proxy|logger
