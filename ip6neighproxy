@@ -1,0 +1,88 @@
+#!/bin/bash
+# License: CC0
+#
+set -e
+export LANG=C
+
+# main
+logger "ip6 neigh proxy service start"
+
+/usr/sbin/conntrack -E -e new -o extended |
+awk '
+	BEGIN{
+		CNT=0
+		MAXCNT=1024
+		TTL=3600
+	}
+
+	$2 ~ /ipv6/{
+		if($4 ~ /tcp/){ 
+			#LIP=mygsub("src=","",$8)
+			GIP=mygsub("dst=","",$14)
+		}else{ 
+			#LIP=mygsub("src=","",$7)
+			GIP=mygsub("dst=","",$13)
+		}
+
+		if(!(GIP in IPs)){
+			CMD=gen_add_cmd(GIP)
+			system(CMD)
+			close(CMD)
+		}
+
+		IPs[GIP]=systime()
+		#print "debug: update: IPs[]=",GIP; fflush()
+	}
+
+	CNT>MAXCNT{
+		CNT=0
+		ST=systime()
+		for(IP in IPs){
+			if(IPs[IP]+TTL < ST){
+				delete IPs[IP]
+				CMD=gen_del_cmd(IP)
+				system(CMD)
+				close(CMD)
+				#print "debug: delete: IPs[]=",IP; fflush()
+			}
+		}
+		#for(IP in IPs){
+		#	print "debug: show: IPs[]=",IP; fflush()
+		#}
+	}
+
+	{
+		CNT++
+	}
+
+	function gen_add_cmd(ip){
+		CMD=sprintf("%s %s dev eth0","/bin/ip -6 neigh add proxy",ip)
+		return CMD
+	}
+	function gen_del_cmd(ip){
+		CMD=sprintf("%s %s dev eth0","/bin/ip -6 neigh del proxy",ip)
+		return CMD
+	}
+	function ipv6exp(ip){
+		n=split(ip,ip2,":")
+		for(i=1;i<=n;i++){
+			if(ip2[i]==""){
+				for(ip2[i]=j=0;j<8-n;j++){
+					ip2[i]=ip2[i]":0"
+				}
+			}
+		}
+		r=""
+		for(i in ip2){
+			if(i==1) r=ip2[i]
+			else r=r":"ip2[i]
+		}
+		return r
+	}
+	function mygsub(reg,replace,target){
+		gsub(reg,replace,target)
+		return target
+	}
+'| logger
+
+logger "ip6 neigh proxy service end"
