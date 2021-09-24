@@ -1,4 +1,4 @@
-# er-x-ipv6-netmap
+# Edgerouter Xでipv6 netmapを使う
 ルータの下にer-xをルータとして設置するが、その下にいるクライアントもipv6で通信したい。
 ipv6 masquerade使えるからそれで問題ないけど興味本位でnetmapを使う。
 ex-xが代理で応答する必要があるが、ndppdがnetmapでも使えるといいけど(dev版はrewriteする機能あるらしい）、neigh proxyに追加すればよいのだろうということで、conntrackの内容をみてスクリプトで追加・削除するようにしてみる。
