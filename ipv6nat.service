@@ -1,0 +1,16 @@
+[Unit]
+Description=IPv6 Nat Maintenace service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/config/user-data/ipv6nat
+ExecStopPost=/bin/bash -c "/sbin/ip6tables -t nat -S|/bin/grep MASQUERADE|while read line;do $(echo $line|/bin/sed 's/^-A/ip6tables -t nat -D/');done"
+
+[Install]
+WantedBy=multi-user.target
+
+
+

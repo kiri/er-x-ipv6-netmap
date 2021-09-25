@@ -1,0 +1,22 @@
+#!/bin/bash
+# License: CC0
+#
+export LANG=C
+
+PREFIX=""
+until [ x$PREFIX != x"" ]; do
+    PREFIX=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*switch0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
+    sleep 0.1
+done
+
+/sbin/ip6tables -t raw -S | grep NOTRACK
+if [ $? -eq 0 ]; then
+  /sbin/ip6tables -t raw -D OUTPUT -j NOTRACK
+  /sbin/ip6tables -t raw -D PREROUTING -j NOTRACK
+fi
+
+/sbin/ip6tables -t nat -S | grep MASQUERADE
+if [ $? -ne 0 ]; then
+    ip6tables -t nat -A POSTROUTING -o eth0 -s $PREFIX -j MASQUERADE
+fi
+
