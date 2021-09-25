@@ -1,0 +1,13 @@
+[Unit]
+Description=IPv6 NETMAP Maintenace service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+ExecStart=/config/user-data/ipv6netmap
+ExecStopPost=/bin/bash -c "/sbin/ip6tables -t nat -S|/bin/grep NETMAP|while read line;do $(echo $line|/bin/sed 's/^-A/ip6tables -t nat -D/');done;/sbin/sysctl -w net.ipv6.conf.all.proxy_ndp=0"
+
+[Install]
+WantedBy=multi-user.target
