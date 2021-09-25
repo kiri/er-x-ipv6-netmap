@@ -1,11 +1,31 @@
 #!/bin/bash
 # License: CC0
 #
-set -e
 export LANG=C
 
 # main
 logger "ip6 neigh proxy service start"
+
+PREFIX1=""
+PREFIX2=""
+until [ $PREFIX1 != "" ] && [ $PREFIX2 != "" ]; do
+    PREFIX1=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*eth0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
+    PREFIX2=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*switch0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
+    sleep 0.1
+done
+
+/sbin/ip6tables -t raw -S | grep NOTRACK
+if [ $? -eq 0 ]; then
+  /sbin/ip6tables -t raw -D OUTPUT -j NOTRACK
+  /sbin/ip6tables -t raw -D PREROUTING -j NOTRACK
+fi
+
+/sbin/ip6tables -t nat -S | grep NETMAP
+if [ $? -ne 0 ]; then
+    /sbin/sysctl -w net.ipv6.conf.all.proxy_ndp=1
+    /sbin/ip6tables -t nat -A POSTROUTING -o eth0 -j NETMAP --to $PREFIX1 -s   $PREFIX2
+    /sbin/ip6tables -t nat -A PREROUTING  -i eth0 -j NETMAP -d   $PREFIX1 --to $PREFIX2
+fi
 
 /usr/sbin/conntrack -E -e new -o extended |
 awk '
