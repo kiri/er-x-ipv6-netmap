@@ -8,7 +8,7 @@ logger "ip6 neigh proxy service start"
 
 PREFIX1=""
 PREFIX2=""
-until [ $PREFIX1 != "" ] && [ $PREFIX2 != "" ]; do
+until [ x$PREFIX1 != x"" ] && [ x$PREFIX2 != x"" ]; do
     PREFIX1=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*eth0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
     PREFIX2=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*switch0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
     sleep 0.1
