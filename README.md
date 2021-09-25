@@ -23,25 +23,29 @@ set interfaces switch switch0 ipv6 router-advert send-advert truekgg
 ```
 
 いずれのファイルも/config/user-data/下に保存する。
-config-ipv6-netmapとip6neighproxyは実行権限付ける。
+ipv6netmapは実行権限を付ける。
 ```
 # cd /config/user-data/
-# chmod +x config-ipv6-netmap
-# chmod +x ip6neighproxy
+# chmod +x ipv6netmap
 ```
 serviceは/etc/systemctl/system/へシンボリックリンク張る。
 ```
-# ln -s /config/user-data/ip6neighproxy.service /etc/systemd/system/
+# ln -s /config/user-data/ipv6netmap.service /etc/systemd/system/
 # systemctl daemon-reload
-# systemctl enable ip6neighproxy.service
-```
-
-/config/scripts/post-config.d/にシンボリックリンク張る。
-```
-# ln -s /config/user-data/config-ipv6-netmap /config/scripts/post-config.d/
+# systemctl enable ipv6netmap.service
+# systemctl start ipv6netmap.service
 ```
 
 うまくうごかなかったら、もろもろとめて、ipv6 masqueradeに戻せば良い。
+systemdで起動するように書いた。
 ```
-ip6tables -t nat -A POSTROUTING -o eth0 -s fd8a:bcde:1234::/64 -j MASQUERADE
+# systemctl stop ipv6netmap.service
+# systemctl disable ipv6netmap.service
+
+# cd /config/user-data/
+# chmod +x ipv6nat
+# ln -s /config/user-data/ipv6nat.service /etc/systemd/system/
+# systemctl daemon-reload
+# systemctl enable ipv6nat.service
+# systemctl start ipv6nat.service
 ```
