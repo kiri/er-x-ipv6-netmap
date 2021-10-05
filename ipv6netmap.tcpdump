@@ -1,0 +1,103 @@
+#!/bin/bash
+# License: CC0
+#
+export LANG=C
+
+# main
+logger "ip6 neigh proxy service start"
+
+PREFIX1=""
+PREFIX2=""
+until [ x$PREFIX1 != x"" ] && [ x$PREFIX2 != x"" ]; do
+    PREFIX1=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*eth0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
+    PREFIX2=$(/bin/ip -6 r |/bin/sed -n "s/^\([^ ]*\) .*switch0.*256.*/\1/p"|grep -v "^fe80"|/usr/bin/tail -1)
+    sleep 0.1
+done
+
+/sbin/ip6tables -t raw -S | grep NOTRACK
+if [ $? -eq 0 ]; then
+  /sbin/ip6tables -t raw -D OUTPUT -j NOTRACK
+  /sbin/ip6tables -t raw -D PREROUTING -j NOTRACK
+fi
+
+/sbin/ip6tables -t nat -S | grep NETMAP
+if [ $? -ne 0 ]; then
+    /sbin/sysctl -w net.ipv6.conf.all.proxy_ndp=1
+    /sbin/ip6tables -t nat -A POSTROUTING -o eth0 -j NETMAP --to $PREFIX1 -s   $PREFIX2
+    /sbin/ip6tables -t nat -A PREROUTING  -i eth0 -j NETMAP -d   $PREFIX1 --to $PREFIX2
+fi
+
+tcpdump -l -p -i switch0 "ip6[40]==135 && icmp6"|
+awk -v PREFIX=$(echo $PREFIX1|sed -e 's/::\/64//') '
+	BEGIN{
+		CNT=0
+		MAXCNT=1024
+		TTL=3600
+	}
+
+	{
+        n=split(ipv6exp(mygsub(",","",$11)),a,":")
+        GIP=sprintf("%s:%s:%s:%s:%s",PREFIX,a[5],a[6],a[7],a[8])
+
+		if(!(GIP in IPs)){
+            CMD=gen_add_cmd(GIP)
+            system(CMD)
+			close(CMD)
+		}
+
+		IPs[GIP]=systime()
+		#print "debug: update: IPs[]=",GIP; fflush()
+	}
+
+	CNT>MAXCNT{
+		CNT=0
+		ST=systime()
+		for(IP in IPs){
+			if(IPs[IP]+TTL < ST){
+				delete IPs[IP]
+				CMD=gen_del_cmd(IP)
+				system(CMD)
+				close(CMD)
+				#print "debug: delete: IPs[]=",IP; fflush()
+			}
+		}
+		#for(IP in IPs){
+		#	print "debug: show: IPs[]=",IP; fflush()
+		#}
+	}
+
+	{
+		CNT++
+	}
+
+	function gen_add_cmd(ip){
+		CMD=sprintf("%s %s dev eth0","/bin/ip -6 neigh add proxy",ip)
+		return CMD
+	}
+	function gen_del_cmd(ip){
+		CMD=sprintf("%s %s dev eth0","/bin/ip -6 neigh del proxy",ip)
+		return CMD
+	}
+	function ipv6exp(ip){
+		n=split(ip,ip2,":")
+		for(i=1;i<=n;i++){
+			if(ip2[i]==""){
+				for(ip2[i]=j=0;j<8-n;j++){
+					ip2[i]=ip2[i]":0"
+				}
+			}
+		}
+		r=""
+		for(i in ip2){
+			if(i==1) r=ip2[i]
+			else r=r":"ip2[i]
+		}
+		return r
+	}
+	function mygsub(reg,replace,target){
+		gsub(reg,replace,target)
+		return target
+	}
+'|logger
+
+logger "ip6 neigh proxy service end"
