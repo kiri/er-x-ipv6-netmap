@@ -4,7 +4,8 @@
 export LANG=C
 
 # main
-logger "ip6 neigh proxy service start"
+(
+echo "ip6 neigh proxy service start"
 
 PREFIX1=""
 PREFIX2=""
@@ -16,15 +17,15 @@ done
 
 /sbin/ip6tables -t raw -S | grep NOTRACK
 if [ $? -eq 0 ]; then
-  /sbin/ip6tables -t raw -D OUTPUT -j NOTRACK
-  /sbin/ip6tables -t raw -D PREROUTING -j NOTRACK
+    /sbin/ip6tables -v -t raw -D OUTPUT -j NOTRACK
+    /sbin/ip6tables -v -t raw -D PREROUTING -j NOTRACK
 fi
 
 /sbin/ip6tables -t nat -S | grep NETMAP
 if [ $? -ne 0 ]; then
     /sbin/sysctl -w net.ipv6.conf.all.proxy_ndp=1
-    /sbin/ip6tables -t nat -A POSTROUTING -o eth0 -j NETMAP --to $PREFIX1 -s   $PREFIX2
-    /sbin/ip6tables -t nat -A PREROUTING  -i eth0 -j NETMAP -d   $PREFIX1 --to $PREFIX2
+    /sbin/ip6tables -v -t nat -A POSTROUTING -o eth0 -j NETMAP --to $PREFIX1 -s   $PREFIX2
+    /sbin/ip6tables -v -t nat -A PREROUTING  -i eth0 -j NETMAP -d   $PREFIX1 --to $PREFIX2
 fi
 
 tcpdump -l -p -i switch0 "ip6[40]==135 && icmp6"|
@@ -35,7 +36,7 @@ awk -v PREFIX=$(echo $PREFIX1|sed -e 's/::\/64//') '
 		TTL=3600
 	}
 
-	{
+	$11 !~ /^fe80/{
         n=split(ipv6exp(mygsub(",","",$11)),a,":")
         GIP=sprintf("%s:%s:%s:%s:%s",PREFIX,a[5],a[6],a[7],a[8])
 
@@ -44,7 +45,6 @@ awk -v PREFIX=$(echo $PREFIX1|sed -e 's/::\/64//') '
             system(CMD)
 			close(CMD)
 		}
-
 		IPs[GIP]=systime()
 		#print "debug: update: IPs[]=",GIP; fflush()
 	}
@@ -97,7 +97,7 @@ awk -v PREFIX=$(echo $PREFIX1|sed -e 's/::\/64//') '
 	function mygsub(reg,replace,target){
 		gsub(reg,replace,target)
 		return target
-	}
-'|logger
+	} '
 
-logger "ip6 neigh proxy service end"
+echo "ip6 neigh proxy service end"
+) |& logger -t $(basename $0)
